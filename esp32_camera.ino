@@ -3,10 +3,8 @@
 #include "esp_camera.h"
 #include <TFT_eSPI.h>
 
-/* ===== TFT ===== */
 TFT_eSPI tft = TFT_eSPI();
 
-/* ===== CAMERA AI THINKER ===== */
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
 #define XCLK_GPIO_NUM      0
@@ -25,20 +23,15 @@ TFT_eSPI tft = TFT_eSPI();
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-/* ===== IMAGE SIZE ===== */
 #define IMG_W 160
 #define IMG_H 120
 
-/* ===== BUFFER ===== */
 uint16_t *snapshot_buf;
 
-/* ===== QUEUE ===== */
 QueueHandle_t frameQueue;
 
-/* ===== FPS CONTROL ===== */
 volatile int frame_count = 0;
 
-/* ===== CAMERA CONFIG ===== */
 static camera_config_t config = {
     .pin_pwdn = PWDN_GPIO_NUM,
     .pin_reset = RESET_GPIO_NUM,
@@ -63,14 +56,13 @@ static camera_config_t config = {
     .ledc_timer = LEDC_TIMER_0,
     .ledc_channel = LEDC_CHANNEL_0,
 
-    .pixel_format = PIXFORMAT_RGB565, // 🚀 nhanh hơn JPEG
-    .frame_size   = FRAMESIZE_QQVGA,  // 160x120
+    .pixel_format = PIXFORMAT_RGB565, 
+    .frame_size   = FRAMESIZE_QQVGA,
 
     .fb_count = 2,
     .fb_location = CAMERA_FB_IN_PSRAM,
 };
 
-/* ===== EI: RGB565 → RGB888 ===== */
 static int ei_camera_get_data(size_t offset, size_t length, float *out_ptr)
 {
     size_t pixel_ix = offset;
@@ -89,7 +81,6 @@ static int ei_camera_get_data(size_t offset, size_t length, float *out_ptr)
     return 0;
 }
 
-/* ===== TASK CAMERA ===== */
 void taskCamera(void *pvParameters)
 {
     while (1)
@@ -99,13 +90,11 @@ void taskCamera(void *pvParameters)
 
         frame_count++;
 
-        // 🚀 Hiển thị
         if (frame_count % 1 == 0)
         {
             tft.pushImage(0, 4, IMG_W, IMG_H, (uint16_t*)fb->buf);
         }
 
-        // 🚀 Gửi frame cho AI
         if (frame_count % 3 == 0)
         {
             xQueueOverwrite(frameQueue, &fb);
@@ -114,11 +103,10 @@ void taskCamera(void *pvParameters)
         {
             esp_camera_fb_return(fb);
         }
+        vTaskDelay(1);
     }
-    vTaskDelay(1);
 }
 
-/* ===== TASK AI ===== */
 void taskAI(void *pvParameters)
 {
     camera_fb_t *fb;
@@ -150,7 +138,6 @@ void taskAI(void *pvParameters)
                     }
                 }
 
-                // 🚀 Hiển thị kết quả
                 if (frame_count % 3 == 0)
                 {                    
                     tft.setTextColor(tft.color565(102, 57, 49), tft.color565(203, 219, 252));
@@ -158,13 +145,11 @@ void taskAI(void *pvParameters)
                     tft.printf("%s %.2f   ", label, max_val);
                 }
             }
-
             esp_camera_fb_return(fb);
         }
     }
 }
 
-/* ===== SETUP ===== */
 void setup()
 {
     Serial.begin(115200);
@@ -195,13 +180,10 @@ void setup()
     s->set_vflip(s, 1);
     s->set_hmirror(s, 1);
 
-    // Queue
     frameQueue = xQueueCreate(1, sizeof(camera_fb_t*));
 
-    // Tasks
     xTaskCreatePinnedToCore(taskCamera, "CAM", 4096, NULL, 2, NULL, 0);
     xTaskCreatePinnedToCore(taskAI, "AI", 4096, NULL, 1, NULL, 1);
 }
 
-/* ===== LOOP ===== */
 void loop() {}
